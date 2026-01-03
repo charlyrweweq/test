@@ -1,4 +1,4 @@
-const CHECK_EVERY_MS = 10000; // 10 segundos
+const CHECK_EVERY_MS = 6000; // 10 segundos
 
 let lastSignature = null;
 
