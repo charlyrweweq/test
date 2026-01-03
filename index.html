@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat Supabase</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        #messagesBox {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            background: #f8f9fa;
+            white-space: pre-wrap;
+        }
+        img {
+            max-width: 220px;
+            display: block;
+            margin-top: 5px;
+        }
+        video {
+            max-width: 260px;
+            display: block;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+<div class="container-fluid d-flex flex-column h-100 p-2">
+
+    <!-- Mensajes -->
+    <div id="messagesBox" class="mb-2"></div>
+
+    <!-- Input -->
+    <div class="d-flex gap-2">
+        <input type="text" id="messageInput" class="form-control" placeholder="Escribe un mensaje...">
+        <input type="file" id="fileInput" class="form-control" accept="image/*,video/*">
+        <button id="sendButton" class="btn btn-primary">SEND</button>
+    </div>
+
+</div>
+
+<script>
+alert("test");
+const SUPABASE_URL = "https://wygotazjjufikhyrkrmg.supabase.co";
+const API_KEY = "sb_publishable_gICDMPsY2_1ebabzjlr1ig_P8pFbi0K";
+
+
+const MESSAGES_URL = `${SUPABASE_URL}/rest/v1/messages`;
+const STORAGE_URL  = `${SUPABASE_URL}/storage/v1/object/chat-media`;
+
+/* ================================
+   ELEMENTOS DOM
+================================ */
+const messagesBox  = document.getElementById("messagesBox");
+const messageInput = document.getElementById("messageInput");
+const fileInput    = document.getElementById("fileInput");
+const sendButton   = document.getElementById("sendButton");
+
+/* ================================
+   CARGAR MENSAJES
+================================ */
+async function loadMessages() {
+    const res = await fetch(`${MESSAGES_URL}?order=id.asc`, {
+        headers: {
+            apikey: API_KEY,
+            Authorization: `Bearer ${API_KEY}`
+        }
+    });
+
+    const data = await res.json();
+    messagesBox.innerHTML = "";
+
+    data.forEach(msg => {
+        const div = document.createElement("div");
+
+        if (msg.type === "image") {
+            div.innerHTML = `User:<br><img src="${msg.file_url}">`;
+        }
+        else if (msg.type === "video") {
+            div.innerHTML = `User:<br><video src="${msg.file_url}" controls></video>`;
+        }
+        else {
+            div.textContent = "User: " + (msg.message ?? "");
+        }
+
+        messagesBox.appendChild(div);
+    });
+
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+}
+
+/* ================================
+   SUBIR ARCHIVO
+================================ */
+async function uploadFile(file) {
+    const fileName = `${Date.now()}_${file.name}`;
+
+    const res = await fetch(`${STORAGE_URL}/${fileName}`, {
+        method: "POST",
+        headers: {
+            apikey: API_KEY,
+            Authorization: `Bearer ${API_KEY}`,
+            "Content-Type": file.type
+        },
+        body: file
+    });
+
+    if (!res.ok) {
+        throw new Error("Error subiendo archivo");
+    }
+
+    return `${SUPABASE_URL}/storage/v1/object/public/chat-media/${fileName}`;
+}
+
+/* ================================
+   ENVIAR MENSAJE
+================================ */
+async function sendMessage() {
+    const text = messageInput.value.trim();
+    const file = fileInput.files[0];
+
+    if (!text && !file) return;
+
+    let payload = {
+        message: text || null,
+        type: "text",
+        file_url: null
+    };
+
+    if (file) {
+        const url = await uploadFile(file);
+        payload.file_url = url;
+        payload.type = file.type.startsWith("video") ? "video" : "image";
+    }
+
+    await fetch(MESSAGES_URL, {
+        method: "POST",
+        headers: {
+            apikey: API_KEY,
+            Authorization: `Bearer ${API_KEY}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+    });
+
+    messageInput.value = "";
+    fileInput.value = "";
+    loadMessages();
+}
+
+/* ================================
+   EVENTOS
+================================ */
+sendButton.addEventListener("click", sendMessage);
+setInterval(loadMessages, 5000);
+loadMessages();
+</script>
+
+</body>
+    <script src="live-reload.js"></script>
+
+</html>
